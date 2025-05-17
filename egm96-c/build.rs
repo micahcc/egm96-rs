@@ -31,9 +31,4 @@ fn main() {
                 .expect("failed to write");
         }
     }
-
-    cc::Build::new()
-        .opt_level(2)
-        .file("src/test_egm96.c")
-        .compile("test_egm96");
 }

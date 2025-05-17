@@ -14,6 +14,19 @@ an altitude offset.
 The library is meant to be easy to use, and especially easy to embed into your
 own softwares.
 
+For rust, just do the normal cargo thing:
+
+```
+cargo add egm96
+```
+
+For C and C++ build with:
+
+```
+cargo build --release
+cp target/release/libegm96.so egm96-c/src/egm96.h /path/to/install
+```
+
 ## About
 
 ### About this implementation
