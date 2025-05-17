@@ -1,4 +1,5 @@
 #![allow(clippy::all)]
+#![allow(clippy::needless_return)]
 
 /*
  * Copyright (c) 2006 D.Ineiev <ineiev@yahoo.co.uk>
@@ -251,7 +252,7 @@ fn wrap_degrees(mut degrees: f64) -> f64 {
 pub fn egm96_compute_altitude_offset(lat: f64, lon: f64) -> f64 {
     let lon = wrap_degrees(lon);
     let lat = lat.clamp(-90.0, 90.0);
-    undulation(lat.to_radians() , lon .to_radians())
+    undulation(lat.to_radians(), lon.to_radians())
 }
 
 #[cfg(test)]

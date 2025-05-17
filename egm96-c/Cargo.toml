@@ -8,7 +8,7 @@ homepage.workspace = true
 readme.workspace = true
 
 [lib]
-name = "EGM96"
+name = "egm96"
 crate-type = ["cdylib"]
 bench = false
 

@@ -8,7 +8,7 @@ homepage.workspace = true
 readme.workspace = true
 
 [lib]
-name = "EGM96_static"
+name = "egm96_static"
 crate-type = ["staticlib"]
 bench = false
 
