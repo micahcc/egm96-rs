@@ -1,3 +1,5 @@
+#![allow(clippy::all)]
+
 /*
  * Copyright (c) 2006 D.Ineiev <ineiev@yahoo.co.uk>
  * Copyright (c) 2020 Emeric Grange <emeric.grange@gmail.com>
