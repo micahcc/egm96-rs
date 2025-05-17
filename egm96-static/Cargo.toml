@@ -7,7 +7,7 @@ license.workspace = true
 homepage.workspace = true
 
 [lib]
-name = "EGM96"
+name = "EGM96_static"
 crate-type = ["staticlib"]
 bench = false
 
