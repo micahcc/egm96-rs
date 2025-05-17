@@ -48,11 +48,11 @@ The [World Geodetic System](https://en.wikipedia.org/wiki/World_Geodetic_System)
 
 The **EGM96 geoid defines** the nominal sea level surface by means of a spherical harmonics series of degree 360. The deviations of the EGM96 geoid from the WGS 84 reference ellipsoid range from about −105 m to about +85 m.
 
-![geoid](about/EGM96.png)
+![geoid](https://raw.githubusercontent.com/micahcc/egm96-rs/refs/heads/master/about/EGM96.png)
 
 In geodesy, a **reference ellipsoid** is a mathematically defined surface that approximates the geoid, which is the truer, imperfect figure of the Earth, or other planetary body, as opposed to a perfect, smooth, and unaltered sphere, which factors in the undulations of the bodies' gravity due to variations in the composition and density of the interior, as well as the subsequent flattening caused by the centrifugal force from the rotation of these massive objects (for planetary bodies that do rotate).
 
-![geoid vs ellipsoid](about/geoid_vs_ellipsoid.png)
+![geoid vs ellipsoid](https://raw.githubusercontent.com/micahcc/egm96-rs/refs/heads/master/about/geoid_vs_ellipsoid.png)
 
 ## Get involved!
 
