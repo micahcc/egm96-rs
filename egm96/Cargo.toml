@@ -1,7 +1,4 @@
 [package]
 name = "egm96"
-version = "0.1.2"
-edition = "2021"
-description = "EGM96 altitude above WGS84 Ellipsoid"
-license = "Zlib"
-homepage = "https://github.com/micahcc/egm96-rs"
+version.workspace = true
+edition.workspace = true
