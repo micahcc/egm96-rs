@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "egm96-rs"
-version = "0.1.0"
+name = "egm96"
+version = "0.1.1"
