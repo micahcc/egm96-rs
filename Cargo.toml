@@ -4,6 +4,7 @@ description = "EGM96 altitude above WGS84 Ellipsoid"
 edition = "2021"
 license = "Zlib"
 homepage = "https://github.com/micahcc/egm96-rs"
+readme = "README.md"
 
 [workspace]
 resolver = "2"

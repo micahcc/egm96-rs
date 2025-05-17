@@ -5,6 +5,7 @@ description.workspace = true
 edition.workspace = true
 license.workspace = true
 homepage.workspace = true
+readme.workspace = true
 
 [lib]
 name = "EGM96_static"
