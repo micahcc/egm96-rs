@@ -2,7 +2,7 @@ use std::env;
 use std::io::prelude::*;
 
 fn main() {
-    // just compile with the egm96.h to ensure it is valid c
+    // just compile with the EGM96.h to ensure it is valid c
     println!("cargo:rerun-if-changed=src/lib.rs");
 
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
@@ -23,10 +23,10 @@ fn main() {
         .generate()
     {
         Ok(result) => {
-            result.write_to_file("src/egm96.h");
+            result.write_to_file("src/EGM96.h");
         }
         Err(err) => {
-            let mut file = std::fs::File::create("src/egm96.h").expect("failed to create");
+            let mut file = std::fs::File::create("src/EGM96.h").expect("failed to create");
             file.write_all(format!("/* Failed to compile: {} */", err).as_bytes())
                 .expect("failed to write");
         }
