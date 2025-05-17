@@ -1,5 +1,5 @@
 [package]
-name = "egm96-rs"
+name = "egm96"
 version = "0.1.0"
 edition = "2021"
 description = "EGM96 altitude above WGS84 Ellipsoid"
