@@ -239,11 +239,17 @@ fn undulation(lat: f64, lon: f64) -> f64 {
     hundu(&p, &sinml, &cosml, gr, re)
 }
 
+fn wrap_degrees(mut degrees: f64) -> f64 {
+    degrees += 180.0;
+    degrees = degrees.rem_euclid(360.0);
+    degrees - 180.0
+}
+
 /// Public function to compute altitude offset using EGM96 model
-#[allow(unused)]
 pub fn egm96_compute_altitude_offset(lat: f64, lon: f64) -> f64 {
-    const RAD: f64 = 180.0 / PI;
-    undulation(lat / RAD, lon / RAD)
+    let lon = wrap_degrees(lon);
+    let lat = lat.clamp(-90.0, 90.0);
+    undulation(lat.to_radians() , lon .to_radians())
 }
 
 #[cfg(test)]
@@ -382,7 +388,6 @@ mod tests {
             let computed = egm96_compute_altitude_offset(check.lat, check.lon);
             let expected = check.geoid;
             let err = (computed - expected).abs();
-            println!("Expected: {expected}, Computed: {computed}");
             if err.is_nan() || err.is_infinite() || err > 0.5 {
                 panic!(
                     "Lat: {}, Lon: {}, Expected: {expected}, Computed: {computed}",
@@ -390,5 +395,21 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_wrap_degrees() {
+        assert_eq!(wrap_degrees(0.0), 0.0);
+        assert_eq!(wrap_degrees(179.8), 179.8);
+        assert_eq!(wrap_degrees(-179.0), -179.0);
+        assert_eq!(wrap_degrees(-181.0), 179.0);
+        assert_eq!(wrap_degrees(190.0), -170.0);
+        assert_eq!(wrap_degrees(-190.0), 170.0);
+        assert_eq!(wrap_degrees(-190.0 - 360.0), 170.0);
+        assert_eq!(wrap_degrees(360.0), 0.0);
+        assert_eq!(wrap_degrees(540.0), -180.0);
+        assert_eq!(wrap_degrees(-540.0), -180.0);
+        assert_eq!(wrap_degrees(1000.0), -80.0);
+        assert_eq!(wrap_degrees(-1000.0), 80.0);
     }
 }

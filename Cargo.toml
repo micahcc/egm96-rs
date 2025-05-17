@@ -7,4 +7,4 @@ homepage = "https://github.com/micahcc/egm96-rs"
 
 [workspace]
 resolver = "2"
-members = ["egm96"]
+members = ["egm96", "egm96-c"]
