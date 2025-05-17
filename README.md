@@ -24,7 +24,7 @@ For C and C++ build with:
 
 ```
 cargo build --release
-cp target/release/libegm96.so egm96-c/src/egm96.h /path/to/install
+cp target/release/libEGM96.a target/release/libEGM96.so egm96-c/src/egm96.h /path/to/install
 ```
 
 ## About
