@@ -7,14 +7,12 @@ license.workspace = true
 homepage.workspace = true
 
 [lib]
-name = "egm96"
+name = "EGM96"
 crate-type = ["cdylib"]
 bench = false
 
 [dependencies]
 egm96 = { path = "../egm96" }
-libc = { version = "0.2" }
 
 [build-dependencies]
-cc = { version = "1" }
 cbindgen = { version = "0" }
