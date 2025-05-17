@@ -71,6 +71,12 @@ In geodesy, a **reference ellipsoid** is a mathematically defined surface that a
 
 You can browse the code on the GitHub page, submit patches and pull requests! Your help would be greatly appreciated ;-)
 
+### Publishing
+
+```
+cargo publish -p egm96
+```
+
 ## License
 
 ```
