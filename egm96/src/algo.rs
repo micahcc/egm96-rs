@@ -177,7 +177,6 @@ fn undulation(lat: f64, lon: f64) -> f64 {
     for j in 1..=NMAX1 {
         let m = j - 1;
         let m1 = m + 1;
-
         for n1 in 3..=m1 {
             let n = n1 - 1;
             let n2 = 2 * n;
@@ -202,19 +201,17 @@ fn undulation(lat: f64, lon: f64) -> f64 {
 
         if m2 <= NMAX1 {
             rleg[m2] = drts[m1 * 2 + 1] * cothet * rleg[m1];
-            if m3 <= NMAX1 {
-                for n1 in m3..=NMAX1 {
-                    let n = n1 - 1;
-                    if (!m == 0 && n < 2) || (m == 1 && n < 3) {
-                        continue;
-                    }
-                    let n2 = 2 * n;
-                    rleg[n1] = drts[n2 + 1]
-                        * dirt[n + m]
-                        * dirt[n - m]
-                        * (drts[n2 - 1] * cothet * rleg[n1 - 1]
-                            - drts[n + m - 1] * drts[n - m - 1] * dirt[n2 - 3] * rleg[n1 - 2]);
+            for n1 in m3..=NMAX1 {
+                let n = n1 - 1;
+                if (!m == 0 && n < 2) || (m == 1 && n < 3) {
+                    continue;
                 }
+                let n2 = 2 * n;
+                rleg[n1] = drts[n2 + 1]
+                    * dirt[n + m]
+                    * dirt[n - m]
+                    * (drts[n2 - 1] * cothet * rleg[n1 - 1]
+                        - drts[n + m - 1] * drts[n - m - 1] * dirt[n2 - 3] * rleg[n1 - 2]);
             }
         }
 
