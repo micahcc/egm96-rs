@@ -54,6 +54,7 @@ use crate::egm96_data::EGM96_DATA;
 
 // Maximum degree and orders of harmonic coefficients
 const NMAX: usize = 360;
+const NMAX1: usize = 361;
 const N361: usize = 361;
 // Size of correction and harmonic coefficients arrays (361*181)
 const COEFFS: usize = 65341;
@@ -121,67 +122,6 @@ fn hundu(
     ((a * GM) / (gr * re)) + (ac / 100.0) - 0.53
 }
 
-fn legfdn(m: usize, theta: f64, rleg: &mut [f64; N361 + 1]) {
-    static DRTS_DIRT: OnceLock<([f64; 1301], [f64; 1301])> = OnceLock::new();
-    let (drts, dirt) = DRTS_DIRT.get_or_init(|| {
-        let nmax2p = (2 * NMAX) + 1;
-        let mut drts = [0.0; 1301];
-        let mut dirt = [0.0; 1301];
-        for n in 1..=nmax2p {
-            drts[n] = (n as f64).sqrt();
-            dirt[n] = 1.0 / drts[n];
-        }
-
-        return (drts, dirt);
-    });
-
-    let mut rlnn = [0.0; N361 + 1];
-
-    let nmax1 = NMAX + 1;
-    let m1 = m + 1;
-    let m2 = m + 2;
-    let m3 = m + 3;
-
-    let cothet = theta.cos();
-    let sithet = theta.sin();
-
-    // compute the legendre functions
-    rlnn[1] = 1.0;
-    rlnn[2] = sithet * drts[3];
-    for n1 in 3..=m1 {
-        let n = n1 - 1;
-        let n2 = 2 * n;
-        rlnn[n1] = drts[n2 + 1] * dirt[n2] * sithet * rlnn[n];
-    }
-
-    if m == 0 {
-        rleg[1] = 1.0;
-        rleg[2] = cothet * drts[3];
-    } else if m == 1 {
-        rleg[2] = rlnn[2];
-        rleg[3] = drts[5] * cothet * rleg[2];
-    }
-    rleg[m1] = rlnn[m1];
-
-    if m2 <= nmax1 {
-        rleg[m2] = drts[m1 * 2 + 1] * cothet * rleg[m1];
-        if m3 <= nmax1 {
-            for n1 in m3..=nmax1 {
-                let n = n1 - 1;
-                if (!m == 0 && n < 2) || (m == 1 && n < 3) {
-                    continue;
-                }
-                let n2 = 2 * n;
-                rleg[n1] = drts[n2 + 1]
-                    * dirt[n + m]
-                    * dirt[n - m]
-                    * (drts[n2 - 1] * cothet * rleg[n1 - 1]
-                        - drts[n + m - 1] * drts[n - m - 1] * dirt[n2 - 3] * rleg[n1 - 2]);
-            }
-        }
-    }
-}
-
 /// Computes geocentric distance, geocentric latitude, and approximate normal gravity
 fn radgra(lat: f64, lon: f64, rlat: &mut f64, gr: &mut f64, re: &mut f64) {
     const A: f64 = 6378137.0;
@@ -202,24 +142,80 @@ fn radgra(lat: f64, lon: f64, rlat: &mut f64, gr: &mut f64, re: &mut f64) {
 
 /// Compute the geoid undulation from the EGM96 model
 fn undulation(lat: f64, lon: f64) -> f64 {
+    static DRTS_DIRT: OnceLock<([f64; 1301], [f64; 1301])> = OnceLock::new();
+    let (drts, dirt) = DRTS_DIRT.get_or_init(|| {
+        let nmax2p = (2 * NMAX) + 1;
+        let mut drts = [0.0; 1301];
+        let mut dirt = [0.0; 1301];
+        for n in 1..=nmax2p {
+            drts[n] = (n as f64).sqrt();
+            dirt[n] = 1.0 / drts[n];
+        }
+
+        return (drts, dirt);
+    });
+
     let mut p = [0.0; COEFFS + 1];
     let mut sinml = [0.0; N361 + 1];
     let mut cosml = [0.0; N361 + 1];
     let mut rleg = [0.0; N361 + 1];
+    let mut rlnn = [0.0; N361 + 1];
 
     let mut rlat = 0.0;
     let mut gr = 0.0;
     let mut re = 0.0;
-    let nmax1 = NMAX + 1;
 
     // Compute the geocentric latitude, geocentric radius, normal gravity
     radgra(lat, lon, &mut rlat, &mut gr, &mut re);
     rlat = (PI / 2.0) - rlat;
+    let cothet = rlat.cos();
+    let sithet = rlat.sin();
 
-    for j in 1..=nmax1 {
+    // compute the legendre functions
+    rlnn[1] = 1.0;
+    rlnn[2] = sithet * drts[3];
+    for j in 1..=NMAX1 {
         let m = j - 1;
-        legfdn(m, rlat, &mut rleg);
-        for i in j..=nmax1 {
+        let m1 = m + 1;
+        for n1 in 3..=m1 {
+            let n = n1 - 1;
+            let n2 = 2 * n;
+            rlnn[n1] = drts[n2 + 1] * dirt[n2] * sithet * rlnn[n];
+        }
+    }
+
+    for j in 1..=NMAX1 {
+        let m = j - 1;
+        let m1 = m + 1;
+        let m2 = m + 2;
+        let m3 = m + 3;
+
+        if m == 0 {
+            rleg[1] = 1.0;
+            rleg[2] = cothet * drts[3];
+        } else if m == 1 {
+            rleg[2] = rlnn[2];
+            rleg[3] = drts[5] * cothet * rleg[2];
+        }
+        rleg[m1] = rlnn[m1];
+
+        if m2 <= NMAX1 {
+            rleg[m2] = drts[m1 * 2 + 1] * cothet * rleg[m1];
+            for n1 in m3..=NMAX1 {
+                let n = n1 - 1;
+                if (!m == 0 && n < 2) || (m == 1 && n < 3) {
+                    continue;
+                }
+                let n2 = 2 * n;
+                rleg[n1] = drts[n2 + 1]
+                    * dirt[n + m]
+                    * dirt[n - m]
+                    * (drts[n2 - 1] * cothet * rleg[n1 - 1]
+                        - drts[n + m - 1] * drts[n - m - 1] * dirt[n2 - 3] * rleg[n1 - 2]);
+            }
+        }
+
+        for i in j..=NMAX1 {
             p[((i - 1) * i) / 2 + m + 1] = rleg[i];
         }
     }
