@@ -21,7 +21,7 @@
  */
 
 /// Precomputed EGM96 correction and harmonic coefficients
-pub static EGM96_DATA: [[f32; 4]; 65342] = [
+pub static EGM96_DATA: [[f64; 4]; 65342] = [
     [0.0, 0.0, 0.0, 0.0],
     [-5.02745, 0.0, 0.0, 0.0],
     [0.362816, 0.0, 0.0, 0.0],
