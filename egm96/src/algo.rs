@@ -230,11 +230,41 @@ fn wrap_degrees(mut degrees: f64) -> f64 {
     degrees - 180.0
 }
 
-/// Public function to compute altitude offset using EGM96 model
-pub fn egm96_compute_altitude_offset(lat: f64, lon: f64) -> f64 {
+pub fn egm96_compute_altitude_offset_harmonics(lat: f64, lon: f64) -> f64 {
     let lon = wrap_degrees(lon);
     let lat = lat.clamp(-90.0, 90.0);
     undulation(lat.to_radians(), lon.to_radians())
+}
+
+#[cfg(feature = "raster_5_min")]
+pub fn egm96_compute_altitude_offset_5_min(lat: f64, lon: f64) -> f64 {
+    todo!()
+}
+
+#[cfg(feature = "raster_15_min")]
+pub fn egm96_compute_altitude_offset_15_min(lat: f64, lon: f64) -> f64 {
+    todo!()
+}
+
+/// Public function to compute altitude offset using EGM96 model
+pub fn egm96_compute_altitude_offset(lat: f64, lon: f64) -> f64 {
+    #[cfg(feature = "raster_5_min")]
+    {
+        // highest res
+        egm96_compute_altitude_offset_15_min(lat, lon)
+    }
+
+    #[cfg(all(feature = "raster_15_min", not(feature = "raster_5_min")))]
+    {
+        // medium res
+        egm96_compute_altitude_offset_15_min(lat, lon)
+    }
+
+    // slow, but little memory
+    #[cfg(all(not(feature = "raster_15_min"), not(feature = "raster_5_min")))]
+    {
+        egm96_compute_altitude_offset_harmonics(lat, lon)
+    }
 }
 
 #[cfg(test)]

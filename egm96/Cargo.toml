@@ -7,9 +7,16 @@ license.workspace = true
 homepage.workspace = true
 readme.workspace = true
 
+[dependencies]
+png = {version = "0.17", optional = true }
+
 [dev-dependencies]
 criterion = { version = "0.6", features = ["html_reports"] }
 
 [[bench]]
 name = "undulation_bench"
 harness = false
+
+[features]
+raster_5_min = ["dep:png"]
+raster_15_min = ["dep:png"]
