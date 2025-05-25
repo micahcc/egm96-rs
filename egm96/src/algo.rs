@@ -252,7 +252,6 @@ fn interpolate<const WIDTH: usize, const HEIGHT: usize>(
     y_step: f64,
     pixels: &[u16],
 ) -> f64 {
-    log::info!("lat: {lat}, lon: {lon}");
     const SCALE: f64 = 0.003;
     const OFFSET: f64 = -108.0;
 
@@ -264,14 +263,6 @@ fn interpolate<const WIDTH: usize, const HEIGHT: usize>(
 
     let x = (lon - x_start) / x_step;
     let y = (lat - y_start) / y_step;
-    log::info!(
-        "lat: {}, y_start: {}, lat - y_start: {}, y_step: {}",
-        lat,
-        y_start,
-        lat - y_start,
-        y_step,
-    );
-    log::info!("x: {x}, y: {y}");
 
     // Determine the integer coordinates surrounding the point.
     let x0 = x.floor() as isize;
@@ -295,12 +286,6 @@ fn interpolate<const WIDTH: usize, const HEIGHT: usize>(
     let top_right = pixels[y0_clamped * WIDTH + x1_clamped] as f64 * SCALE + OFFSET;
     let bottom_left = pixels[y1_clamped * WIDTH + x0_clamped] as f64 * SCALE + OFFSET;
     let bottom_right = pixels[y1_clamped * WIDTH + x1_clamped] as f64 * SCALE + OFFSET;
-    log::info!("{}, {}: {top_left}", x0_clamped, y0_clamped);
-    log::info!("{}, {}: {top_right}", x1_clamped, y0_clamped);
-    log::info!("{}, {}: {bottom_left}", x0_clamped, y1_clamped);
-    log::info!("{}, {}: {bottom_right}", x1_clamped, y1_clamped);
-    log::info!("dx: {dx}");
-    log::info!("dy: {dy}");
 
     // Interpolate in the x direction on the top and bottom rows.
     let top = top_left + dx * (top_right - top_left);
