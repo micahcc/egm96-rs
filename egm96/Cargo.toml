@@ -9,6 +9,7 @@ readme.workspace = true
 
 [dependencies]
 png = {version = "0.17", optional = true }
+tiff = {version = "0.9", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.6", features = ["html_reports"] }
@@ -18,5 +19,6 @@ name = "undulation_bench"
 harness = false
 
 [features]
+default = ["raster_5_min", "raster_15_min"]
 raster_5_min = ["dep:png"]
 raster_15_min = ["dep:png"]
