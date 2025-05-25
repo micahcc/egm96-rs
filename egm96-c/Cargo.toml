@@ -17,3 +17,8 @@ egm96 = { path = "../egm96" }
 
 [build-dependencies]
 cbindgen = { version = "0" }
+
+[features]
+default = ["raster_15_min", "raster_5_min"]
+raster_5_min = ["egm96/raster_5_min"]
+raster_15_min = ["egm96/raster_15_min"]

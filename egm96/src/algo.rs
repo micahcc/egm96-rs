@@ -236,7 +236,7 @@ fn wrap_degrees(mut degrees: f64) -> f64 {
     degrees - 180.0
 }
 
-pub fn egm96_compute_altitude_offset_harmonics(lat: f64, lon: f64) -> f64 {
+pub fn egm96_compute_altitude_offset(lat: f64, lon: f64) -> f64 {
     let lon = wrap_degrees(lon);
     let lat = lat.clamp(-90.0, 90.0);
     undulation(lat.to_radians(), lon.to_radians())
@@ -383,7 +383,7 @@ pub fn egm96_raster_15_min_altitude_offset(lat: f64, lon: f64) -> f64 {
 }
 
 /// Public function to compute altitude offset using EGM96 model
-pub fn egm96_compute_altitude_offset(lat: f64, lon: f64) -> f64 {
+pub fn egm96_altitude_offset(lat: f64, lon: f64) -> f64 {
     #[cfg(feature = "raster_5_min")]
     {
         // highest res
@@ -399,7 +399,7 @@ pub fn egm96_compute_altitude_offset(lat: f64, lon: f64) -> f64 {
     // slow, but little memory
     #[cfg(all(not(feature = "raster_15_min"), not(feature = "raster_5_min")))]
     {
-        egm96_compute_altitude_offset_harmonics(lat, lon)
+        egm96_compute_altitude_offset(lat, lon)
     }
 }
 
@@ -536,7 +536,7 @@ mod tests {
         ];
 
         for check in checks {
-            let computed = egm96_compute_altitude_offset_harmonics(check.lat, check.lon);
+            let computed = egm96_compute_altitude_offset(check.lat, check.lon);
             let expected = check.geoid;
             let err = (computed - expected).abs();
             if err.is_nan() || err.is_infinite() || err > 0.5 {
@@ -567,7 +567,8 @@ mod tests {
     #[cfg(feature = "raster_5_min")]
     #[test]
     fn test_5min_at_locations() {
-        env_logger::init();
+        let _ = env_logger::builder().is_test(true).try_init();
+
         struct Check {
             lat: f64,
             lon: f64,
@@ -683,7 +684,7 @@ mod tests {
     #[test]
     #[cfg(feature = "raster_15_min")]
     fn test_15min_at_locations() {
-        env_logger::init();
+        let _ = env_logger::builder().is_test(true).try_init();
 
         struct Check {
             lat: f64,

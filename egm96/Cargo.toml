@@ -20,6 +20,6 @@ name = "undulation_bench"
 harness = false
 
 [features]
-default = ["raster_5_min"] # pretty small 1MB for 20x speedup (500micros -> 20micros)
+default = ["raster_15_min", "raster_5_min"]
 raster_5_min = ["dep:png"]
 raster_15_min = ["dep:png"]
