@@ -10,9 +10,10 @@ readme.workspace = true
 [dependencies]
 png = {version = "0.17", optional = true }
 tiff = {version = "0.9", optional = true }
-
-[dev-dependencies]
 criterion = { version = "0.6", features = ["html_reports"] }
+
+log = { workspace = true }
+env_logger = { workspace = true }
 
 [[bench]]
 name = "undulation_bench"

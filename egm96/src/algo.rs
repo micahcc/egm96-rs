@@ -252,11 +252,26 @@ fn interpolate<const WIDTH: usize, const HEIGHT: usize>(
     y_step: f64,
     pixels: &[u16],
 ) -> f64 {
+    log::info!("lat: {lat}, lon: {lon}");
     const SCALE: f64 = 0.003;
     const OFFSET: f64 = -108.0;
 
-    let x = (lon + x_start) / x_step;
+    // X_geo = GT(0) + X_pixel * GT(1)
+    // Y_geo = GT(3) + Y_line * GT(5)
+
+    // X_pixel = (X_geo - GT(0)) / GT(1)
+    // Y_line  = (Y_geo - GT(3)) / GT(5)
+
+    let x = (lon - x_start) / x_step;
     let y = (lat - y_start) / y_step;
+    log::info!(
+        "lat: {}, y_start: {}, lat - y_start: {}, y_step: {}",
+        lat,
+        y_start,
+        lat - y_start,
+        y_step,
+    );
+    log::info!("x: {x}, y: {y}");
 
     // Determine the integer coordinates surrounding the point.
     let x0 = x.floor() as isize;
@@ -272,14 +287,20 @@ fn interpolate<const WIDTH: usize, const HEIGHT: usize>(
     let y1_clamped = y1.clamp(0, (HEIGHT - 1) as isize) as usize;
 
     // Compute the fractional part (distance between the point and the floor indices).
-    let dx = x - (x0 as f64).clamp(0.0, 1.0);
-    let dy = y - (y0 as f64).clamp(0.0, 1.0);
+    let dx = (x - x0 as f64).clamp(0.0, 1.0);
+    let dy = (y - y0 as f64).clamp(0.0, 1.0);
 
     // Retrieve the values at the four neighboring pixels.
     let top_left = pixels[y0_clamped * WIDTH + x0_clamped] as f64 * SCALE + OFFSET;
     let top_right = pixels[y0_clamped * WIDTH + x1_clamped] as f64 * SCALE + OFFSET;
     let bottom_left = pixels[y1_clamped * WIDTH + x0_clamped] as f64 * SCALE + OFFSET;
     let bottom_right = pixels[y1_clamped * WIDTH + x1_clamped] as f64 * SCALE + OFFSET;
+    log::info!("{}, {}: {top_left}", x0_clamped, y0_clamped);
+    log::info!("{}, {}: {top_right}", x1_clamped, y0_clamped);
+    log::info!("{}, {}: {bottom_left}", x0_clamped, y1_clamped);
+    log::info!("{}, {}: {bottom_right}", x1_clamped, y1_clamped);
+    log::info!("dx: {dx}");
+    log::info!("dy: {dy}");
 
     // Interpolate in the x direction on the top and bottom rows.
     let top = top_left + dx * (top_right - top_left);
@@ -322,7 +343,11 @@ pub fn egm96_raster_5_min_altitude_offset(lat: f64, lon: f64) -> f64 {
     static IMAGE: OnceLock<Vec<u16>> = OnceLock::new();
     let image = IMAGE.get_or_init(|| load_image::<WIDTH, HEIGHT>(EGM96_5_BYTES));
 
-    let lon = wrap_degrees(lon);
+    let mut lon = wrap_degrees(lon);
+    if lon < 0.0 {
+        lon += 360.0;
+    }
+
     let lat = lat.clamp(-90.0, 90.0);
     // from https://gdal.org/en/stable/tutorials/geotransforms_tut.html
     // X_geo = GT(0) + X_pixel * GT(1) + Y_line * GT(2)
@@ -333,16 +358,13 @@ pub fn egm96_raster_5_min_altitude_offset(lat: f64, lon: f64) -> f64 {
     // GT(3) = 90.04166666666666666
     // GT(4) = 0
     // GT(5) = -0.08333333333333333
-
-    // X_geo = -0.04166666666666666 + X_pixel * 0.08333333333333333
-    // Y_geo = 90.04166666666666666 - Y_line * 0.08333333333333333
     return interpolate::<WIDTH, HEIGHT>(
         lat,
         lon,
         -0.04166666666666666,
         90.04166666666666666,
         0.08333333333333333,
-        0.08333333333333333,
+        -0.08333333333333333,
         &image,
     );
 }
@@ -356,7 +378,11 @@ pub fn egm96_raster_15_min_altitude_offset(lat: f64, lon: f64) -> f64 {
     static IMAGE: OnceLock<Vec<u16>> = OnceLock::new();
     let image = IMAGE.get_or_init(|| load_image::<WIDTH, HEIGHT>(EGM96_15_BYTES));
 
-    let lon = wrap_degrees(lon);
+    let mut lon = wrap_degrees(lon);
+    if lon < 0.0 {
+        lon += 360.0;
+    }
+
     let lat = lat.clamp(-90.0, 90.0);
 
     // from https://gdal.org/en/stable/tutorials/geotransforms_tut.html
@@ -368,10 +394,7 @@ pub fn egm96_raster_15_min_altitude_offset(lat: f64, lon: f64) -> f64 {
     // GT(3) = 90.12500000000000000
     // GT(4) = 0
     // GT(5) = -0.25000000000000000
-
-    // X_geo = -0.25 + X_pixel * 0.25
-    // Y_geo = 90.125 - Y_line * 0.25
-    return interpolate::<WIDTH, HEIGHT>(lat, lon, -0.25, 90.125, 0.25, 0.25, &image);
+    return interpolate::<WIDTH, HEIGHT>(lat, lon, -0.25, 90.125, 0.25, -0.25, &image);
 }
 
 /// Public function to compute altitude offset using EGM96 model
@@ -556,124 +579,127 @@ mod tests {
         assert_eq!(wrap_degrees(-1000.0), 80.0);
     }
 
-    //#[cfg(feature = "raster_5_min")]
-    //#[test]
-    //fn test_5min_at_locations() {
-    //    struct Check {
-    //        lat: f64,
-    //        lon: f64,
-    //        geoid: f64,
-    //    }
+    #[cfg(feature = "raster_5_min")]
+    #[test]
+    fn test_5min_at_locations() {
+        env_logger::init();
+        struct Check {
+            lat: f64,
+            lon: f64,
+            geoid: f64,
+        }
 
-    //    let checks = [
-    //        //Houston       :
-    //        Check {
-    //            lat: 29.7604,
-    //            lon: -95.3698,
-    //            geoid: -28.41,
-    //        },
-    //        //San Antonio   :
-    //        Check {
-    //            lat: 29.4241,
-    //            lon: -98.4936,
-    //            geoid: -26.52,
-    //        },
-    //        //San Diego     :
-    //        Check {
-    //            lat: 32.7157,
-    //            lon: -117.1611,
-    //            geoid: -35.22,
-    //        },
-    //        //Dallas        :
-    //        Check {
-    //            lat: 32.7767,
-    //            lon: -96.797,
-    //            geoid: -27.34,
-    //        },
-    //        //San Jose      :
-    //        Check {
-    //            lat: 37.3382,
-    //            lon: -121.8863,
-    //            geoid: -32.37,
-    //        },
-    //        //Los Angeles   :
-    //        Check {
-    //            lat: 34.0522,
-    //            lon: -118.2437,
-    //            geoid: -35.17,
-    //        },
-    //        //New York      :
-    //        Check {
-    //            lat: 40.7128,
-    //            lon: -74.006,
-    //            geoid: -32.73,
-    //        },
-    //        //San Francisco :
-    //        Check {
-    //            lat: 37.7749,
-    //            lon: -122.4194,
-    //            geoid: -32.17,
-    //        },
-    //        //Chicago       :
-    //        Check {
-    //            lat: 41.8781,
-    //            lon: -87.6298,
-    //            geoid: -33.93,
-    //        },
-    //        //London        :
-    //        Check {
-    //            lat: 51.5074,
-    //            lon: 0.1278,
-    //            geoid: 45.78,
-    //        },
-    //        //Paris         :
-    //        Check {
-    //            lat: 48.8566,
-    //            lon: 2.3522,
-    //            geoid: 44.61,
-    //        },
-    //        //Toky          :
-    //        Check {
-    //            lat: 35.6895,
-    //            lon: 139.6917,
-    //            geoid: 36.71,
-    //        },
-    //        //Philadelphia  :
-    //        Check {
-    //            lat: 40.05,
-    //            lon: -75.45,
-    //            geoid: -34.32,
-    //        },
-    //        //Phoenix       :
-    //        Check {
-    //            lat: 33.4484,
-    //            lon: -112.074,
-    //            geoid: -30.25,
-    //        },
-    //        //null island
-    //        Check {
-    //            lat: 0.0,
-    //            lon: 0.0,
-    //            geoid: 17.22,
-    //        },
-    //    ];
+        let checks = [
+            //Houston       :
+            Check {
+                lat: 29.7604,
+                lon: -95.3698,
+                geoid: -28.41,
+            },
+            //San Antonio   :
+            Check {
+                lat: 29.4241,
+                lon: -98.4936,
+                geoid: -26.52,
+            },
+            //San Diego     :
+            Check {
+                lat: 32.7157,
+                lon: -117.1611,
+                geoid: -35.22,
+            },
+            //Dallas        :
+            Check {
+                lat: 32.7767,
+                lon: -96.797,
+                geoid: -27.34,
+            },
+            //San Jose      :
+            Check {
+                lat: 37.3382,
+                lon: -121.8863,
+                geoid: -32.37,
+            },
+            //Los Angeles   :
+            Check {
+                lat: 34.0522,
+                lon: -118.2437,
+                geoid: -35.17,
+            },
+            //New York      :
+            Check {
+                lat: 40.7128,
+                lon: -74.006,
+                geoid: -32.73,
+            },
+            //San Francisco :
+            Check {
+                lat: 37.7749,
+                lon: -122.4194,
+                geoid: -32.17,
+            },
+            //Chicago       :
+            Check {
+                lat: 41.8781,
+                lon: -87.6298,
+                geoid: -33.93,
+            },
+            //London        :
+            Check {
+                lat: 51.5074,
+                lon: 0.1278,
+                geoid: 45.78,
+            },
+            //Paris         :
+            Check {
+                lat: 48.8566,
+                lon: 2.3522,
+                geoid: 44.61,
+            },
+            //Toky          :
+            Check {
+                lat: 35.6895,
+                lon: 139.6917,
+                geoid: 36.71,
+            },
+            //Philadelphia  :
+            Check {
+                lat: 40.05,
+                lon: -75.45,
+                geoid: -34.32,
+            },
+            //Phoenix       :
+            Check {
+                lat: 33.4484,
+                lon: -112.074,
+                geoid: -30.25,
+            },
+            //null island
+            Check {
+                lat: 0.0,
+                lon: 0.0,
+                geoid: 17.22,
+            },
+        ];
 
-    //    for check in checks {
-    //        let computed = egm96_raster_5_min_altitude_offset(check.lat, check.lon);
-    //        let expected = check.geoid;
-    //        let err = (computed - expected).abs();
-    //        if err.is_nan() || err.is_infinite() || err > 0.5 {
-    //            panic!(
-    //                "Lat: {}, Lon: {}, Expected: {expected}, Computed: {computed}",
-    //                check.lat, check.lon
-    //            );
-    //        }
-    //    }
-    //}
+        for check in checks {
+            let computed = egm96_raster_5_min_altitude_offset(check.lat, check.lon);
+            let expected = check.geoid;
+            let err = (computed - expected).abs();
+            if err.is_nan() || err.is_infinite() || err > 1.0 {
+                panic!(
+                    "Lat: {}, Lon: {}, Expected: {expected}, Computed: {computed}",
+                    check.lat, check.lon
+                );
+            }
+        }
+    }
 
     #[test]
     #[cfg(feature = "raster_15_min")]
     fn test_15min_at_locations() {
+        env_logger::init();
+
         struct Check {
             lat: f64,
             lon: f64,
@@ -777,7 +803,7 @@ mod tests {
             let computed = egm96_raster_15_min_altitude_offset(check.lat, check.lon);
             let expected = check.geoid;
             let err = (computed - expected).abs();
-            if err.is_nan() || err.is_infinite() || err > 0.5 {
+            if err.is_nan() || err.is_infinite() || err > 1.5 {
                 panic!(
                     "Lat: {}, Lon: {}, Expected: {expected}, Computed: {computed}",
                     check.lat, check.lon

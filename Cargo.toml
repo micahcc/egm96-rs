@@ -9,3 +9,7 @@ readme = "README.md"
 [workspace]
 resolver = "2"
 members = ["egm96", "egm96-c", "egm96-static"]
+
+[workspace.dependencies]
+log = "0"
+env_logger = "0"
