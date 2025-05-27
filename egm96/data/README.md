@@ -1,3 +1,7 @@
+# Source
+
+- https://earth-info.nga.mil/
+
 # NOTE: THIS IS A LOAD-BEARING DIRECTORY
 
 crates.io won't let me push my giant fixture PNGs, so I have to lazily load them
