@@ -6,6 +6,7 @@ edition.workspace = true
 license.workspace = true
 homepage.workspace = true
 readme.workspace = true
+exclude = ["data"]
 
 [dependencies]
 png = {version = "0.17", optional = true }

@@ -341,7 +341,7 @@ dependencies = [
 
 [[package]]
 name = "egm96"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "criterion",
  "env_logger",
@@ -352,7 +352,7 @@ dependencies = [
 
 [[package]]
 name = "egm96-c"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "cbindgen",
  "egm96",
@@ -360,7 +360,7 @@ dependencies = [
 
 [[package]]
 name = "egm96-static"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "cbindgen",
  "egm96",
