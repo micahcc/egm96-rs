@@ -379,7 +379,7 @@ pub fn egm96_raster_15_min_altitude_offset(lat: f64, lon: f64) -> f64 {
     // GT(3) = 90.12500000000000000
     // GT(4) = 0
     // GT(5) = -0.25000000000000000
-    return interpolate::<WIDTH, HEIGHT>(lat, lon, -0.25, 90.125, 0.25, -0.25, &image);
+    return interpolate::<WIDTH, HEIGHT>(lat, lon, -0.125, 90.125, 0.25, -0.25, &image);
 }
 
 /// Public function to compute altitude offset using EGM96 model
@@ -705,30 +705,30 @@ mod tests {
                 lon: -98.4936,
                 geoid: -26.52,
             },
-            ////San Diego     :
-            //Check {
-            //    lat: 32.7157,
-            //    lon: -117.1611,
-            //    geoid: -35.22,
-            //},
+            //San Diego     :
+            Check {
+                lat: 32.7157,
+                lon: -117.1611,
+                geoid: -35.22,
+            },
             //Dallas        :
-            //Check {
-            //    lat: 32.7767,
-            //    lon: -96.797,
-            //    geoid: -27.34,
-            //},
+            Check {
+                lat: 32.7767,
+                lon: -96.797,
+                geoid: -27.34,
+            },
             //San Jose      :
             Check {
                 lat: 37.3382,
                 lon: -121.8863,
                 geoid: -32.37,
             },
-            ////Los Angeles   :
-            //Check {
-            //    lat: 34.0522,
-            //    lon: -118.2437,
-            //    geoid: -35.17,
-            //},
+            //Los Angeles   :
+            Check {
+                lat: 34.0522,
+                lon: -118.2437,
+                geoid: -35.17,
+            },
             //New York      :
             Check {
                 lat: 40.7128,
@@ -760,11 +760,11 @@ mod tests {
                 geoid: 44.61,
             },
             //Tokyo
-            //Check {
-            //    lat: 35.6895,
-            //    lon: 139.6917,
-            //    geoid: 36.71,
-            //},
+            Check {
+                lat: 35.355,
+                lon: 139.895,
+                geoid: 47303.0 * 0.003 - 108.0,
+            },
             //Philadelphia  :
             Check {
                 lat: 40.05,
