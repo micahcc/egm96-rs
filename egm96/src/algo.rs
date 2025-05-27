@@ -60,10 +60,10 @@ const N361: usize = 361;
 const COEFFS: usize = 65341;
 
 #[cfg(feature = "raster_15_min")]
-const EGM96_15_BYTES: &[u8] = include_bytes!("../data/egm96-15.png");
+const EGM96_15_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/egm96-15.png"));
 
 #[cfg(feature = "raster_5_min")]
-const EGM96_5_BYTES: &[u8] = include_bytes!("../data/egm96-5.png");
+const EGM96_5_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/egm96-5.png"));
 
 /***************************************************************************/
 
