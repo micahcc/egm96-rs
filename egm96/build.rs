@@ -45,5 +45,4 @@ fn main() {
             ),
         );
     }
-    //load_blob("egm96-5.png, "EGM96_5_MIN", format!("{URL_ROOT}/egm96-5.png"), "8ffac9c8de89190b58d4cde923743a332ca9f6f8b34c5d981bfca59172d9e782"));
 }
