@@ -8,10 +8,15 @@ struct Fixture<'a> {
     environ: &'a str,
 }
 
+#[allow(unused)]
 fn load_blob(name: &str, env_name: &str, url: String, out_name: String) {
     if let Ok(env) = std::env::var(env_name) {
         std::os::unix::fs::symlink(env, out_name).expect("Failed to symlink.");
-    } else {
+        return;
+    }
+
+    #[cfg(feature = "fetch-maps")]
+    {
         let help = format!("To use a local file: set environment variable: {env_name}");
         let response =
             reqwest::blocking::get(url).expect(&format!("Failed to get {}. {help}", name));
@@ -20,7 +25,10 @@ fn load_blob(name: &str, env_name: &str, url: String, out_name: String) {
             File::create(&out_name).expect(&format!("Failed to create output file. {help}"));
         dest.write_all(&content)
             .expect(&format!("Failed to write {out_name}. {help}"));
+        return;
     }
+
+    unreachable!("fetch-maps feature is not enabled, and environment {env_name} has not been set!");
 }
 
 fn main() {

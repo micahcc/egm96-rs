@@ -12,7 +12,7 @@ exclude = ["data"]
 png = {version = "0.17", optional = true }
 
 [build-dependencies]
-reqwest = { version = "0" , features = ["blocking", "native-tls-vendored"] }
+reqwest = { version = "0" , features = ["blocking", "native-tls-vendored"], optional = true}
 
 [dev-dependencies]
 criterion = { version = "0.6", features = ["html_reports"] }
@@ -24,6 +24,7 @@ name = "undulation_bench"
 harness = false
 
 [features]
-default = ["raster_15_min", "raster_5_min"]
+default = ["fetch-maps", "raster_5_min"]
 raster_5_min = ["dep:png"]
 raster_15_min = ["dep:png"]
+fetch-maps = ["dep:reqwest"]
