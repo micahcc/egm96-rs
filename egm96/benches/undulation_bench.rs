@@ -5,13 +5,13 @@ use criterion::{criterion_group, criterion_main, Criterion};
 fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("cts autoselect", |b| {
         b.iter(|| {
-            egm96::egm96_compute_altitude_offset(black_box(33.4818), black_box(-117.556));
+            egm96::egm96_altitude_offset(black_box(33.4818), black_box(-117.556));
         })
     });
 
     c.bench_function("cts harmonics", |b| {
         b.iter(|| {
-            egm96::egm96_compute_altitude_offset_harmonics(black_box(33.4818), black_box(-117.556));
+            egm96::egm96_compute_altitude_offset(black_box(33.4818), black_box(-117.556));
         })
     });
 
