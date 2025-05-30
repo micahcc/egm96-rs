@@ -10,14 +10,16 @@ struct Fixture<'a> {
 
 fn load_blob(name: &str, env_name: &str, url: String, out_name: String) {
     if let Ok(env) = std::env::var(env_name) {
-        std::os::unix::fs::symlink(env, out_name).expect("Failed to symlink");
+        std::os::unix::fs::symlink(env, out_name).expect("Failed to symlink.");
     } else {
-        let response = reqwest::blocking::get(url).expect(&format!("Failed to get {}", name));
-        let content = response.bytes().expect("failed to get bytes");
+        let help = format!("To use a local file: set environment variable: {env_name}");
+        let response =
+            reqwest::blocking::get(url).expect(&format!("Failed to get {}. {help}", name));
+        let content = response.bytes().expect("Failed to get bytes. {help}");
         let mut dest =
-            File::create(&out_name).expect(&format!("Failed to create output file for {name}"));
+            File::create(&out_name).expect(&format!("Failed to create output file. {help}"));
         dest.write_all(&content)
-            .expect(&format!("Failed to write to {}", out_name));
+            .expect(&format!("Failed to write {out_name}. {help}"));
     }
 }
 
