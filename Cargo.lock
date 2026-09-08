@@ -452,7 +452,7 @@ checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
 name = "egm96"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "criterion",
  "env_logger",
@@ -463,7 +463,7 @@ dependencies = [
 
 [[package]]
 name = "egm96-c"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "cbindgen",
  "egm96",
@@ -471,7 +471,7 @@ dependencies = [
 
 [[package]]
 name = "egm96-static"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "cbindgen",
  "egm96",
