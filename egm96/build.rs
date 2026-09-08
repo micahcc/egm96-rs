@@ -11,6 +11,9 @@ struct Fixture<'a> {
 #[allow(unused)]
 fn load_blob(name: &str, env_name: &str, url: String, out_name: String) {
     if let Ok(env) = std::env::var(env_name) {
+        // OUT_DIR may be reused across builds (e.g. warm CI caches), so clear any
+        // stale link/file before recreating it.
+        let _ = std::fs::remove_file(&out_name);
         std::os::unix::fs::symlink(env, out_name).expect("Failed to symlink.");
         return;
     }
@@ -19,12 +22,12 @@ fn load_blob(name: &str, env_name: &str, url: String, out_name: String) {
     {
         let help = format!("To use a local file: set environment variable: {env_name}");
         let response =
-            reqwest::blocking::get(url).expect(&format!("Failed to get {}. {help}", name));
+            reqwest::blocking::get(url).unwrap_or_else(|_| panic!("Failed to get {name}. {help}"));
         let content = response.bytes().expect("Failed to get bytes. {help}");
-        let mut dest =
-            File::create(&out_name).expect(&format!("Failed to create output file. {help}"));
+        let mut dest = File::create(&out_name)
+            .unwrap_or_else(|_| panic!("Failed to create output file. {help}"));
         dest.write_all(&content)
-            .expect(&format!("Failed to write {out_name}. {help}"));
+            .unwrap_or_else(|_| panic!("Failed to write {out_name}. {help}"));
         return;
     }
 

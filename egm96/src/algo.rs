@@ -296,10 +296,15 @@ fn interpolate<const WIDTH: usize, const HEIGHT: usize>(
 }
 
 fn load_image<const WIDTH: usize, const HEIGHT: usize>(bytes: &[u8]) -> Vec<u16> {
-    let decoder = png::Decoder::new(bytes);
+    let decoder = png::Decoder::new(std::io::Cursor::new(bytes));
     let mut reader = decoder.read_info().expect("Failed to check info");
     // Allocate the output buffer.
-    let mut buf = vec![0; reader.output_buffer_size()];
+    let mut buf = vec![
+        0;
+        reader
+            .output_buffer_size()
+            .expect("output buffer too large")
+    ];
     // Read the next frame. An Atiff might contain multiple frames.
     let info = reader.next_frame(&mut buf).expect("Failed to get frame");
 
