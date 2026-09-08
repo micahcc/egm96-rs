@@ -9,7 +9,7 @@ readme.workspace = true
 exclude = ["data"]
 
 [dependencies]
-png = { version = "0.17", optional = true }
+png = { version = "0.18", optional = true }
 
 [build-dependencies]
 reqwest = { version = "0", features = [
@@ -18,7 +18,7 @@ reqwest = { version = "0", features = [
 ], optional = true }
 
 [dev-dependencies]
-criterion = { version = "0.6", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 log = { workspace = true }
 env_logger = { workspace = true }
 
