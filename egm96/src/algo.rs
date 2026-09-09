@@ -45,6 +45,7 @@
  * of Geodetic Science and Surveying, the Ohio State University, Columbus, 1982
  **/
 
+use std::cell::RefCell;
 use std::f64::consts::PI;
 use std::sync::OnceLock;
 
@@ -66,6 +67,30 @@ const EGM96_15_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/egm96-15
 const EGM96_5_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/egm96-5.png"));
 
 /***************************************************************************/
+
+struct Egm96Scratch {
+    p: Box<[f64; COEFFS + 1]>,
+    sinml: Box<[f64; N361 + 1]>,
+    cosml: Box<[f64; N361 + 1]>,
+    rleg: Box<[f64; N361 + 1]>,
+    rlnn: Box<[f64; N361 + 1]>,
+}
+
+impl Egm96Scratch {
+    fn new() -> Self {
+        Self {
+            p: Box::new([0.0; COEFFS + 1]),
+            sinml: Box::new([0.0; N361 + 1]),
+            cosml: Box::new([0.0; N361 + 1]),
+            rleg: Box::new([0.0; N361 + 1]),
+            rlnn: Box::new([0.0; N361 + 1]),
+        }
+    }
+}
+
+thread_local! {
+    static SCRATCH: RefCell<Egm96Scratch> = RefCell::new(Egm96Scratch::new());
+}
 
 /// Compute sine and cosine values for the given longitude
 fn dscml(rlon: f64, sinml: &mut [f64; N361 + 1], cosml: &mut [f64; N361 + 1]) {
@@ -157,77 +182,79 @@ fn undulation(lat: f64, lon: f64) -> f64 {
             drts[n] = (n as f64).sqrt();
             dirt[n] = 1.0 / drts[n];
         }
-
-        return (drts, dirt);
+        (drts, dirt)
     });
 
-    let mut p = [0.0; COEFFS + 1];
-    let mut sinml = [0.0; N361 + 1];
-    let mut cosml = [0.0; N361 + 1];
-    let mut rleg = [0.0; N361 + 1];
-    let mut rlnn = [0.0; N361 + 1];
+    SCRATCH.with(|scratch| {
+        let mut s = scratch.borrow_mut();
+        let Egm96Scratch {
+            p,
+            sinml,
+            cosml,
+            rleg,
+            rlnn,
+        } = &mut *s;
 
-    let mut rlat = 0.0;
-    let mut gr = 0.0;
-    let mut re = 0.0;
+        let mut rlat = 0.0;
+        let mut gr = 0.0;
+        let mut re = 0.0;
 
-    // Compute the geocentric latitude, geocentric radius, normal gravity
-    radgra(lat, lon, &mut rlat, &mut gr, &mut re);
-    rlat = (PI / 2.0) - rlat;
-    let cothet = rlat.cos();
-    let sithet = rlat.sin();
+        radgra(lat, lon, &mut rlat, &mut gr, &mut re);
+        rlat = (PI / 2.0) - rlat;
+        let cothet = rlat.cos();
+        let sithet = rlat.sin();
 
-    // compute the legendre functions
-    rlnn[1] = 1.0;
-    rlnn[2] = sithet * drts[3];
-    for j in 1..=NMAX1 {
-        let m = j - 1;
-        let m1 = m + 1;
-        for n1 in 3..=m1 {
-            let n = n1 - 1;
-            let n2 = 2 * n;
-            rlnn[n1] = drts[n2 + 1] * dirt[n2] * sithet * rlnn[n];
-        }
-    }
-
-    for j in 1..=NMAX1 {
-        let m = j - 1;
-        let m1 = m + 1;
-        let m2 = m + 2;
-        let m3 = m + 3;
-
-        if m == 0 {
-            rleg[1] = 1.0;
-            rleg[2] = cothet * drts[3];
-        } else if m == 1 {
-            rleg[2] = rlnn[2];
-            rleg[3] = drts[5] * cothet * rleg[2];
-        }
-        rleg[m1] = rlnn[m1];
-
-        if m2 <= NMAX1 {
-            rleg[m2] = drts[m1 * 2 + 1] * cothet * rleg[m1];
-            for n1 in m3..=NMAX1 {
+        rlnn[1] = 1.0;
+        rlnn[2] = sithet * drts[3];
+        for j in 1..=NMAX1 {
+            let m = j - 1;
+            let m1 = m + 1;
+            for n1 in 3..=m1 {
                 let n = n1 - 1;
-                if (!m == 0 && n < 2) || (m == 1 && n < 3) {
-                    continue;
-                }
                 let n2 = 2 * n;
-                rleg[n1] = drts[n2 + 1]
-                    * dirt[n + m]
-                    * dirt[n - m]
-                    * (drts[n2 - 1] * cothet * rleg[n1 - 1]
-                        - drts[n + m - 1] * drts[n - m - 1] * dirt[n2 - 3] * rleg[n1 - 2]);
+                rlnn[n1] = drts[n2 + 1] * dirt[n2] * sithet * rlnn[n];
             }
         }
 
-        for i in j..=NMAX1 {
-            p[((i - 1) * i) / 2 + m + 1] = rleg[i];
-        }
-    }
-    dscml(lon, &mut sinml, &mut cosml);
+        for j in 1..=NMAX1 {
+            let m = j - 1;
+            let m1 = m + 1;
+            let m2 = m + 2;
+            let m3 = m + 3;
 
-    hundu(&p, &sinml, &cosml, gr, re)
+            if m == 0 {
+                rleg[1] = 1.0;
+                rleg[2] = cothet * drts[3];
+            } else if m == 1 {
+                rleg[2] = rlnn[2];
+                rleg[3] = drts[5] * cothet * rleg[2];
+            }
+            rleg[m1] = rlnn[m1];
+
+            if m2 <= NMAX1 {
+                rleg[m2] = drts[m1 * 2 + 1] * cothet * rleg[m1];
+                for n1 in m3..=NMAX1 {
+                    let n = n1 - 1;
+                    if (!m == 0 && n < 2) || (m == 1 && n < 3) {
+                        continue;
+                    }
+                    let n2 = 2 * n;
+                    rleg[n1] = drts[n2 + 1]
+                        * dirt[n + m]
+                        * dirt[n - m]
+                        * (drts[n2 - 1] * cothet * rleg[n1 - 1]
+                            - drts[n + m - 1] * drts[n - m - 1] * dirt[n2 - 3] * rleg[n1 - 2]);
+                }
+            }
+
+            for i in j..=NMAX1 {
+                p[((i - 1) * i) / 2 + m + 1] = rleg[i];
+            }
+        }
+        dscml(lon, sinml, cosml);
+
+        hundu(p, sinml, cosml, gr, re)
+    })
 }
 
 fn wrap_degrees(mut degrees: f64) -> f64 {
@@ -292,7 +319,7 @@ fn interpolate<const WIDTH: usize, const HEIGHT: usize>(
     let bottom = bottom_left + dx * (bottom_right - bottom_left);
 
     // interpolate in the y direction between the top and bottom interpolated values.
-    return top + dy * (bottom - top);
+    top + dy * (bottom - top)
 }
 
 fn load_image<const WIDTH: usize, const HEIGHT: usize>(bytes: &[u8]) -> Vec<u16> {
@@ -316,13 +343,11 @@ fn load_image<const WIDTH: usize, const HEIGHT: usize>(bytes: &[u8]) -> Vec<u16>
         }
     }
 
-    return out;
+    out
 }
 
 #[cfg(feature = "raster_5_min")]
 pub fn egm96_raster_5_min_altitude_offset(lat: f64, lon: f64) -> f64 {
-    use std::sync::OnceLock;
-
     const WIDTH: usize = 4320;
     const HEIGHT: usize = 2161;
     static IMAGE: OnceLock<Vec<u16>> = OnceLock::new();
@@ -343,21 +368,19 @@ pub fn egm96_raster_5_min_altitude_offset(lat: f64, lon: f64) -> f64 {
     // GT(3) = 90.04166666666666666
     // GT(4) = 0
     // GT(5) = -0.08333333333333333
-    return interpolate::<WIDTH, HEIGHT>(
+    interpolate::<WIDTH, HEIGHT>(
         lat,
         lon,
         -0.04166666666666666,
         90.04166666666666666,
         0.08333333333333333,
         -0.08333333333333333,
-        &image,
-    );
+        image,
+    )
 }
 
 #[cfg(feature = "raster_15_min")]
 pub fn egm96_raster_15_min_altitude_offset(lat: f64, lon: f64) -> f64 {
-    use std::sync::OnceLock;
-
     const WIDTH: usize = 1440;
     const HEIGHT: usize = 721;
     static IMAGE: OnceLock<Vec<u16>> = OnceLock::new();
@@ -379,7 +402,7 @@ pub fn egm96_raster_15_min_altitude_offset(lat: f64, lon: f64) -> f64 {
     // GT(3) = 90.12500000000000000
     // GT(4) = 0
     // GT(5) = -0.25000000000000000
-    return interpolate::<WIDTH, HEIGHT>(lat, lon, -0.125, 90.125, 0.25, -0.25, &image);
+    interpolate::<WIDTH, HEIGHT>(lat, lon, -0.125, 90.125, 0.25, -0.25, image)
 }
 
 /// Public function to compute altitude offset using EGM96 model
@@ -404,567 +427,5 @@ pub fn egm96_altitude_offset(lat: f64, lon: f64) -> f64 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::f64::consts::FRAC_PI_2;
-
-    #[test]
-    fn test_radgra_at_equator() {
-        let lat = 0.0;
-        let lon = 0.0;
-        let mut rlat = 0.0;
-        let mut gr = 0.0;
-        let mut re = 0.0;
-        radgra(lat, lon, &mut rlat, &mut gr, &mut re);
-        assert!((rlat).abs() < 1e-9); // Geocentric latitude should be close to 0 at equator
-        assert!((re - 6378137.0).abs() < 1e-9); // Geocentric radius should be close to semi-major axis
-        assert!((gr - 9.7803253359).abs() < 1e-9); // Normal gravity at equator
-    }
-
-    #[test]
-    fn test_radgra_at_pole() {
-        let lat = FRAC_PI_2;
-        let lon = 0.0;
-        let mut rlat = 0.0;
-        let mut gr = 0.0;
-        let mut re = 0.0;
-        radgra(lat, lon, &mut rlat, &mut gr, &mut re);
-        assert!((rlat - FRAC_PI_2).abs() < 1e-9); // Geocentric latitude should be close to pi/2 at pole
-        assert!((re - 6356752.314245).abs() < 1e-6); // Geocentric radius at pole (semi-minor axis)
-        assert!((gr - 9.8321863685).abs() < 1e-5); // Normal gravity at pole
-    }
-
-    #[test]
-    fn test_undulation_at_locations() {
-        struct Check {
-            lat: f64,
-            lon: f64,
-            geoid: f64,
-        }
-
-        let checks = [
-            //Houston       :
-            Check {
-                lat: 29.7604,
-                lon: -95.3698,
-                geoid: -28.41,
-            },
-            //San Antonio   :
-            Check {
-                lat: 29.4241,
-                lon: -98.4936,
-                geoid: -26.52,
-            },
-            //San Diego     :
-            Check {
-                lat: 32.7157,
-                lon: -117.1611,
-                geoid: -35.22,
-            },
-            //Dallas        :
-            Check {
-                lat: 32.7767,
-                lon: -96.797,
-                geoid: -27.34,
-            },
-            //San Jose      :
-            Check {
-                lat: 37.3382,
-                lon: -121.8863,
-                geoid: -32.37,
-            },
-            //Los Angeles   :
-            Check {
-                lat: 34.0522,
-                lon: -118.2437,
-                geoid: -35.17,
-            },
-            //New York      :
-            Check {
-                lat: 40.7128,
-                lon: -74.006,
-                geoid: -32.73,
-            },
-            //San Francisco :
-            Check {
-                lat: 37.7749,
-                lon: -122.4194,
-                geoid: -32.17,
-            },
-            //Chicago       :
-            Check {
-                lat: 41.8781,
-                lon: -87.6298,
-                geoid: -33.93,
-            },
-            //London        :
-            Check {
-                lat: 51.5074,
-                lon: 0.1278,
-                geoid: 45.78,
-            },
-            //Paris         :
-            Check {
-                lat: 48.8566,
-                lon: 2.3522,
-                geoid: 44.61,
-            },
-            //Toky          :
-            Check {
-                lat: 35.6895,
-                lon: 139.6917,
-                geoid: 36.71,
-            },
-            //Philadelphia  :
-            Check {
-                lat: 40.05,
-                lon: -75.45,
-                geoid: -34.32,
-            },
-            //Phoenix       :
-            Check {
-                lat: 33.4484,
-                lon: -112.074,
-                geoid: -30.25,
-            },
-            //null island
-            Check {
-                lat: 0.0,
-                lon: 0.0,
-                geoid: 17.22,
-            },
-        ];
-
-        for check in checks {
-            let computed = egm96_compute_altitude_offset(check.lat, check.lon);
-            let expected = check.geoid;
-            let err = (computed - expected).abs();
-            if err.is_nan() || err.is_infinite() || err > 0.5 {
-                panic!(
-                    "Lat: {}, Lon: {}, Expected: {expected}, Computed: {computed}",
-                    check.lat, check.lon
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn test_wrap_degrees() {
-        assert_eq!(wrap_degrees(0.0), 0.0);
-        assert_eq!(wrap_degrees(179.8), 179.8);
-        assert_eq!(wrap_degrees(-179.0), -179.0);
-        assert_eq!(wrap_degrees(-181.0), 179.0);
-        assert_eq!(wrap_degrees(190.0), -170.0);
-        assert_eq!(wrap_degrees(-190.0), 170.0);
-        assert_eq!(wrap_degrees(-190.0 - 360.0), 170.0);
-        assert_eq!(wrap_degrees(360.0), 0.0);
-        assert_eq!(wrap_degrees(540.0), -180.0);
-        assert_eq!(wrap_degrees(-540.0), -180.0);
-        assert_eq!(wrap_degrees(1000.0), -80.0);
-        assert_eq!(wrap_degrees(-1000.0), 80.0);
-    }
-
-    #[cfg(feature = "raster_5_min")]
-    #[test]
-    fn test_5min_at_locations() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
-        struct Check {
-            lat: f64,
-            lon: f64,
-            geoid: f64,
-        }
-
-        let checks = [
-            //Houston       :
-            Check {
-                lat: 29.7604,
-                lon: -95.3698,
-                geoid: -28.41,
-            },
-            //San Antonio   :
-            Check {
-                lat: 29.4241,
-                lon: -98.4936,
-                geoid: -26.52,
-            },
-            //San Diego     :
-            Check {
-                lat: 32.7157,
-                lon: -117.1611,
-                geoid: -35.22,
-            },
-            //Dallas        :
-            Check {
-                lat: 32.7767,
-                lon: -96.797,
-                geoid: -27.34,
-            },
-            //San Jose      :
-            Check {
-                lat: 37.3382,
-                lon: -121.8863,
-                geoid: -32.37,
-            },
-            //Los Angeles   :
-            Check {
-                lat: 34.0522,
-                lon: -118.2437,
-                geoid: -35.17,
-            },
-            //New York      :
-            Check {
-                lat: 40.7128,
-                lon: -74.006,
-                geoid: -32.73,
-            },
-            //San Francisco :
-            Check {
-                lat: 37.7749,
-                lon: -122.4194,
-                geoid: -32.17,
-            },
-            //Chicago       :
-            Check {
-                lat: 41.8781,
-                lon: -87.6298,
-                geoid: -33.93,
-            },
-            //London        :
-            Check {
-                lat: 51.5074,
-                lon: 0.1278,
-                geoid: 45.78,
-            },
-            //Paris         :
-            Check {
-                lat: 48.8566,
-                lon: 2.3522,
-                geoid: 44.61,
-            },
-            //Toky          :
-            Check {
-                lat: 35.6895,
-                lon: 139.6917,
-                geoid: 36.71,
-            },
-            //Philadelphia  :
-            Check {
-                lat: 40.05,
-                lon: -75.45,
-                geoid: -34.32,
-            },
-            //Phoenix       :
-            Check {
-                lat: 33.4484,
-                lon: -112.074,
-                geoid: -30.25,
-            },
-            //null island
-            Check {
-                lat: 0.0,
-                lon: 0.0,
-                geoid: 17.22,
-            },
-        ];
-
-        for check in checks {
-            let computed = egm96_raster_5_min_altitude_offset(check.lat, check.lon);
-            let expected = check.geoid;
-            let err = (computed - expected).abs();
-            if err.is_nan() || err.is_infinite() || err > 0.5 {
-                panic!(
-                    "Lat: {}, Lon: {}, Expected: {expected}, Computed: {computed}",
-                    check.lat, check.lon
-                );
-            }
-        }
-    }
-
-    #[test]
-    #[cfg(feature = "raster_15_min")]
-    fn test_15min_at_locations() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
-        struct Check {
-            lat: f64,
-            lon: f64,
-            geoid: f64,
-        }
-
-        let checks = [
-            //Houston       :
-            Check {
-                lat: 29.7604,
-                lon: -95.3698,
-                geoid: -28.41,
-            },
-            //San Antonio   :
-            Check {
-                lat: 29.4241,
-                lon: -98.4936,
-                geoid: -26.52,
-            },
-            //San Diego     :
-            Check {
-                lat: 32.7157,
-                lon: -117.1611,
-                geoid: -35.22,
-            },
-            //Dallas        :
-            Check {
-                lat: 32.7767,
-                lon: -96.797,
-                geoid: -27.34,
-            },
-            //San Jose      :
-            Check {
-                lat: 37.3382,
-                lon: -121.8863,
-                geoid: -32.37,
-            },
-            //Los Angeles   :
-            Check {
-                lat: 34.0522,
-                lon: -118.2437,
-                geoid: -35.17,
-            },
-            //New York      :
-            Check {
-                lat: 40.7128,
-                lon: -74.006,
-                geoid: -32.73,
-            },
-            //San Francisco :
-            Check {
-                lat: 37.7749,
-                lon: -122.4194,
-                geoid: -32.17,
-            },
-            //Chicago       :
-            Check {
-                lat: 41.8781,
-                lon: -87.6298,
-                geoid: -33.93,
-            },
-            //London        :
-            Check {
-                lat: 51.5074,
-                lon: 0.1278,
-                geoid: 45.78,
-            },
-            //Paris         :
-            Check {
-                lat: 48.8566,
-                lon: 2.3522,
-                geoid: 44.61,
-            },
-            //Tokyo
-            Check {
-                lat: 35.355,
-                lon: 139.895,
-                geoid: 47303.0 * 0.003 - 108.0,
-            },
-            //Philadelphia  :
-            Check {
-                lat: 40.05,
-                lon: -75.45,
-                geoid: -34.32,
-            },
-            //Phoenix       :
-            Check {
-                lat: 33.4484,
-                lon: -112.074,
-                geoid: -30.25,
-            },
-            //null island
-            Check {
-                lat: 0.0,
-                lon: 0.0,
-                geoid: 17.22,
-            },
-        ];
-
-        for (i, check) in checks.iter().enumerate() {
-            let computed = egm96_raster_15_min_altitude_offset(check.lat, check.lon);
-            let expected = check.geoid;
-            let err = (computed - expected).abs();
-            if err.is_nan() || err.is_infinite() || err > 0.5 {
-                panic!(
-                    "{i}, Lat: {}, Lon: {}, Expected: {expected}, Computed: {computed}",
-                    check.lat, check.lon
-                );
-            }
-        }
-    }
-
-    // In these tests, we will use a simple 3x3 image.
-    // We define WIDTH = 3 and HEIGHT = 3.
-    // The pixel array is provided row-major order.
-    // For example, we fill the pixels with various values:
-    // Row 0: 100, 110, 120
-    // Row 1: 130, 140, 150
-    // Row 2: 160, 170, 180
-    //
-    // Also note that the interpolation function applies:
-    // value => value * SCALE + OFFSET, where SCALE = 0.003 and OFFSET = -108.
-    //
-    // Therefore:
-    // For pixel 100: 100 * 0.003 - 108 = -107.7
-    // For pixel 110: 110 * 0.003 - 108 = -107.67
-    // For pixel 120: 120 * 0.003 - 108 = -107.64
-    // For pixel 130: 130 * 0.003 - 108 = -107.61
-    // For pixel 140: 140 * 0.003 - 108 = -107.58
-    // For pixel 150: 150 * 0.003 - 108 = -107.55
-    // For pixel 160: 160 * 0.003 - 108 = -107.52
-    // For pixel 170: 170 * 0.003 - 108 = -107.49
-    // For pixel 180: 180 * 0.003 - 108 = -107.46
-
-    const WIDTH: usize = 3;
-    const HEIGHT: usize = 3;
-
-    // Define our test image pixels.
-    const PIXELS: [u16; WIDTH * HEIGHT] = [100, 110, 120, 130, 140, 150, 160, 170, 180];
-
-    // We'll use x_start = 0.0 and y_start = 0.0 with steps of 1.0.
-    const X_START: f64 = 0.0;
-    const Y_START: f64 = 0.0;
-    const X_STEP: f64 = 1.0;
-    const Y_STEP: f64 = 1.0;
-
-    // A helper function to compare two floating-point numbers within an epsilon.
-    fn approx_eq(a: f64, b: f64, epsilon: f64) -> bool {
-        (a - b).abs() < epsilon
-    }
-
-    #[test]
-    fn test_exact_top_left() {
-        // Testing a point that exactly maps to the top-left pixel.
-        // lat = 0, lon = 0; therefore, x = 0, y = 0.
-        let lat = 0.0;
-        let lon = 0.0;
-        let result =
-            interpolate::<WIDTH, HEIGHT>(lat, lon, X_START, Y_START, X_STEP, Y_STEP, &PIXELS);
-        // Expected value is the value of pixel at (0,0): 100 * 0.003 - 108 = -107.7
-        let expected = 100.0 * 0.003 - 108.0;
-        assert!(
-            approx_eq(result, expected, 1e-6),
-            "Expected {}, got {}",
-            expected,
-            result
-        );
-    }
-
-    #[test]
-    fn test_exact_bottom_right() {
-        // Testing a point that exactly maps to the bottom-right pixel.
-        // For a 3x3 image, bottom-right pixel is at (2,2).
-        let lat = 2.0;
-        let lon = 2.0;
-        let result =
-            interpolate::<WIDTH, HEIGHT>(lat, lon, X_START, Y_START, X_STEP, Y_STEP, &PIXELS);
-        // Expected value is the value of pixel at (2,2): 180 * 0.003 - 108 = -107.46
-        let expected = 180.0 * 0.003 - 108.0;
-        assert!(
-            approx_eq(result, expected, 1e-6),
-            "Expected {}, got {}",
-            expected,
-            result
-        );
-    }
-
-    #[test]
-    fn test_center_interpolation() {
-        // Testing a point that lies in the exact center of the top-left 2x2 block.
-        // For lat = 0.5 and lon = 0.5, x, y = 0.5, so dx = 0.5 and dy = 0.5.
-        //
-        // The four neighboring pixel values:
-        // top_left: (0,0) => 100 * 0.003 - 108 = -107.7
-        // top_right: (1,0) => 110 * 0.003 - 108 = -107.67
-        // bottom_left: (0,1) => 130 * 0.003 - 108 = -107.61
-        // bottom_right: (1,1) => 140 * 0.003 - 108 = -107.58
-        //
-        // Interpolating:
-        // top = -107.7 + 0.5 * ( -107.67 - (-107.7) ) = -107.7 + 0.5 * 0.03 = -107.685
-        // bottom = -107.61 + 0.5 * ( -107.58 - (-107.61) ) = -107.61 + 0.5 * 0.03 = -107.595
-        // result = top + 0.5 * (bottom - top) = -107.685 + 0.5 * (0.09) = -107.685 + 0.045 = -107.64
-        let lat = 0.5;
-        let lon = 0.5;
-        let result =
-            interpolate::<WIDTH, HEIGHT>(lat, lon, X_START, Y_START, X_STEP, Y_STEP, &PIXELS);
-        let expected = -107.64; // Based on the interpolation above.
-        assert!(
-            approx_eq(result, expected, 1e-6),
-            "Expected {}, got {}",
-            expected,
-            result
-        );
-    }
-
-    #[test]
-    fn test_right_edge_clamping() {
-        // Testing a point on the right boundary that may have an x coordinate equal to WIDTH - 1.
-        // For lon = 2.0 and lat = 0.0, x = 2.0 and y = 0.0.
-        // The surrounding indices become:
-        // x0 = 2, x1 = 3 (clamped to 2); y0 = 0, y1 = 1.
-        // All x values used in interpolation will refer to column index 2.
-        let lat = 0.0;
-        let lon = 2.0;
-        let result =
-            interpolate::<WIDTH, HEIGHT>(lat, lon, X_START, Y_START, X_STEP, Y_STEP, &PIXELS);
-        // Expected value is the pixel at (2,0): 120 * 0.003 - 108 = -107.64.
-        let expected = 120.0 * 0.003 - 108.0;
-        assert!(
-            approx_eq(result, expected, 1e-6),
-            "Expected {}, got {}",
-            expected,
-            result
-        );
-    }
-
-    #[test]
-    fn test_negative_coordinates_clamping() {
-        // Testing a point with negative lat and lon.
-        // For lat = -0.5 and lon = -0.5, the computed x and y are -0.5.
-        // x0 = -1 and y0 = -1. After clamping, they become 0.
-        // x1 and y1 are then also clamped to 0.
-        //
-        // Thus, all four neighbors are pixel (0,0).
-        let lat = -0.5;
-        let lon = -0.5;
-        let result =
-            interpolate::<WIDTH, HEIGHT>(lat, lon, X_START, Y_START, X_STEP, Y_STEP, &PIXELS);
-        // Expected value is pixel at (0,0): 100 * 0.003 - 108 = -107.7.
-        let expected = 100.0 * 0.003 - 108.0;
-        assert!(
-            approx_eq(result, expected, 1e-6),
-            "Expected {}, got {}",
-            expected,
-            result
-        );
-    }
-
-    #[test]
-    fn test_bottom_edge_interpolation() {
-        // Testing a point on the lower edge where y is exactly at HEIGHT-1.
-        // For lat = 2.0 and lon = 1.5, x = 1.5, y = 2.0.
-        // x0 = 1, x1 = 2; y0 = 2, y1 = 3 (clamped to 2).
-        // In this case the top and bottom rows are the same (row 2).
-        let lat = 2.0;
-        let lon = 1.5;
-        let result =
-            interpolate::<WIDTH, HEIGHT>(lat, lon, X_START, Y_START, X_STEP, Y_STEP, &PIXELS);
-        // The interpolation is only in x.
-        // For row 2, the pixels at x=1 and x=2 are:
-        // pixel at (1,2): 170 * 0.003 - 108 = -107.49
-        // pixel at (2,2): 180 * 0.003 - 108 = -107.46
-        // x factor = 0.5, so expected = -107.49 + 0.5 * (-107.46 + 107.49) = -107.49 + 0.5 * 0.03 = -107.475
-        let expected = -107.475;
-        assert!(
-            approx_eq(result, expected, 1e-6),
-            "Expected {}, got {}",
-            expected,
-            result
-        );
-    }
-}
+#[path = "full_suite.rs"]
+mod full_suite;

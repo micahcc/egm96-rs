@@ -4,15 +4,18 @@ version.workspace = true
 description.workspace = true
 edition.workspace = true
 license.workspace = true
-homepage.workspace = true
+repository.workspace = true
 readme.workspace = true
 exclude = ["data"]
 
 [dependencies]
-png = {version = "0.17", optional = true }
+png = { version = "0.17", optional = true }
 
 [build-dependencies]
-reqwest = { version = "0" , features = ["blocking", "native-tls-vendored"], optional = true}
+reqwest = { version = "0.13", features = [
+    "blocking",
+    "native-tls-vendored",
+], optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.6", features = ["html_reports"] }

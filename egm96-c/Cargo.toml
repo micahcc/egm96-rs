@@ -4,7 +4,7 @@ version.workspace = true
 description.workspace = true
 edition.workspace = true
 license.workspace = true
-homepage.workspace = true
+repository.workspace = true
 readme.workspace = true
 
 [lib]
@@ -16,9 +16,10 @@ bench = false
 egm96 = { path = "../egm96" }
 
 [build-dependencies]
-cbindgen = { version = "0" }
+cbindgen = { version = "0.29" }
 
 [features]
 default = ["raster_15_min", "raster_5_min"]
 raster_5_min = ["egm96/raster_5_min"]
 raster_15_min = ["egm96/raster_15_min"]
+fetch-maps = ["egm96/fetch-maps"]
