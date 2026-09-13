@@ -1,7 +1,11 @@
-use std::fs::{self, File};
+use std::fs;
+#[cfg(feature = "fetch-maps")]
+use std::fs::File;
+#[cfg(feature = "fetch-maps")]
 use std::io::Write;
 use std::path::Path;
 
+#[cfg(any(feature = "raster_15_min", feature = "raster_5_min"))]
 const URL_ROOT: &str = "https://micahcc.github.io/egm96-rs/egm96/data";
 
 #[allow(unused)]

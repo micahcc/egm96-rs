@@ -322,6 +322,7 @@ fn interpolate<const WIDTH: usize, const HEIGHT: usize>(
     top + dy * (bottom - top)
 }
 
+#[cfg(any(feature = "raster_15_min", feature = "raster_5_min"))]
 fn load_image<const WIDTH: usize, const HEIGHT: usize>(bytes: &[u8]) -> Vec<u16> {
     let decoder = png::Decoder::new(std::io::Cursor::new(bytes));
     let mut reader = decoder.read_info().expect("Failed to check info");
