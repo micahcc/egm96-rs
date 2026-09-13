@@ -16,8 +16,10 @@ fn load_blob(name: &str, env_name: &str, url: String, out_name: String) {
     {
         let help = format!("To use a local file: set environment variable: {env_name}");
 
-        let response =
-            reqwest::blocking::get(&url).unwrap_or_else(|_| panic!("Failed to GET {name}. {help}"));
+        let response = reqwest::blocking::get(&url)
+            .unwrap_or_else(|_| panic!("Failed to GET {name}. {help}"))
+            .error_for_status()
+            .unwrap_or_else(|_| panic!("Failed HTTP status for {name}. {help}"));
 
         let content = response
             .bytes()
