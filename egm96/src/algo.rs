@@ -45,6 +45,7 @@
  * of Geodetic Science and Surveying, the Ohio State University, Columbus, 1982
  **/
 
+use std::cell::RefCell;
 use std::f64::consts::PI;
 use std::sync::OnceLock;
 
@@ -66,6 +67,30 @@ const EGM96_15_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/egm96-15
 const EGM96_5_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/egm96-5.png"));
 
 /***************************************************************************/
+
+struct Egm96Scratch {
+    p: Box<[f64; COEFFS + 1]>,
+    sinml: Box<[f64; N361 + 1]>,
+    cosml: Box<[f64; N361 + 1]>,
+    rleg: Box<[f64; N361 + 1]>,
+    rlnn: Box<[f64; N361 + 1]>,
+}
+
+impl Egm96Scratch {
+    fn new() -> Self {
+        Self {
+            p: Box::new([0.0; COEFFS + 1]),
+            sinml: Box::new([0.0; N361 + 1]),
+            cosml: Box::new([0.0; N361 + 1]),
+            rleg: Box::new([0.0; N361 + 1]),
+            rlnn: Box::new([0.0; N361 + 1]),
+        }
+    }
+}
+
+thread_local! {
+    static SCRATCH: RefCell<Egm96Scratch> = RefCell::new(Egm96Scratch::new());
+}
 
 /// Compute sine and cosine values for the given longitude
 fn dscml(rlon: f64, sinml: &mut [f64; N361 + 1], cosml: &mut [f64; N361 + 1]) {
@@ -157,77 +182,79 @@ fn undulation(lat: f64, lon: f64) -> f64 {
             drts[n] = (n as f64).sqrt();
             dirt[n] = 1.0 / drts[n];
         }
-
-        return (drts, dirt);
+        (drts, dirt)
     });
 
-    let mut p = [0.0; COEFFS + 1];
-    let mut sinml = [0.0; N361 + 1];
-    let mut cosml = [0.0; N361 + 1];
-    let mut rleg = [0.0; N361 + 1];
-    let mut rlnn = [0.0; N361 + 1];
+    SCRATCH.with(|scratch| {
+        let mut s = scratch.borrow_mut();
+        let Egm96Scratch {
+            p,
+            sinml,
+            cosml,
+            rleg,
+            rlnn,
+        } = &mut *s;
 
-    let mut rlat = 0.0;
-    let mut gr = 0.0;
-    let mut re = 0.0;
+        let mut rlat = 0.0;
+        let mut gr = 0.0;
+        let mut re = 0.0;
 
-    // Compute the geocentric latitude, geocentric radius, normal gravity
-    radgra(lat, lon, &mut rlat, &mut gr, &mut re);
-    rlat = (PI / 2.0) - rlat;
-    let cothet = rlat.cos();
-    let sithet = rlat.sin();
+        radgra(lat, lon, &mut rlat, &mut gr, &mut re);
+        rlat = (PI / 2.0) - rlat;
+        let cothet = rlat.cos();
+        let sithet = rlat.sin();
 
-    // compute the legendre functions
-    rlnn[1] = 1.0;
-    rlnn[2] = sithet * drts[3];
-    for j in 1..=NMAX1 {
-        let m = j - 1;
-        let m1 = m + 1;
-        for n1 in 3..=m1 {
-            let n = n1 - 1;
-            let n2 = 2 * n;
-            rlnn[n1] = drts[n2 + 1] * dirt[n2] * sithet * rlnn[n];
-        }
-    }
-
-    for j in 1..=NMAX1 {
-        let m = j - 1;
-        let m1 = m + 1;
-        let m2 = m + 2;
-        let m3 = m + 3;
-
-        if m == 0 {
-            rleg[1] = 1.0;
-            rleg[2] = cothet * drts[3];
-        } else if m == 1 {
-            rleg[2] = rlnn[2];
-            rleg[3] = drts[5] * cothet * rleg[2];
-        }
-        rleg[m1] = rlnn[m1];
-
-        if m2 <= NMAX1 {
-            rleg[m2] = drts[m1 * 2 + 1] * cothet * rleg[m1];
-            for n1 in m3..=NMAX1 {
+        rlnn[1] = 1.0;
+        rlnn[2] = sithet * drts[3];
+        for j in 1..=NMAX1 {
+            let m = j - 1;
+            let m1 = m + 1;
+            for n1 in 3..=m1 {
                 let n = n1 - 1;
-                if (!m == 0 && n < 2) || (m == 1 && n < 3) {
-                    continue;
-                }
                 let n2 = 2 * n;
-                rleg[n1] = drts[n2 + 1]
-                    * dirt[n + m]
-                    * dirt[n - m]
-                    * (drts[n2 - 1] * cothet * rleg[n1 - 1]
-                        - drts[n + m - 1] * drts[n - m - 1] * dirt[n2 - 3] * rleg[n1 - 2]);
+                rlnn[n1] = drts[n2 + 1] * dirt[n2] * sithet * rlnn[n];
             }
         }
 
-        for i in j..=NMAX1 {
-            p[((i - 1) * i) / 2 + m + 1] = rleg[i];
-        }
-    }
-    dscml(lon, &mut sinml, &mut cosml);
+        for j in 1..=NMAX1 {
+            let m = j - 1;
+            let m1 = m + 1;
+            let m2 = m + 2;
+            let m3 = m + 3;
 
-    hundu(&p, &sinml, &cosml, gr, re)
+            if m == 0 {
+                rleg[1] = 1.0;
+                rleg[2] = cothet * drts[3];
+            } else if m == 1 {
+                rleg[2] = rlnn[2];
+                rleg[3] = drts[5] * cothet * rleg[2];
+            }
+            rleg[m1] = rlnn[m1];
+
+            if m2 <= NMAX1 {
+                rleg[m2] = drts[m1 * 2 + 1] * cothet * rleg[m1];
+                for n1 in m3..=NMAX1 {
+                    let n = n1 - 1;
+                    if (m != 0 && n < 2) || (m == 1 && n < 3) {
+                        continue;
+                    }
+                    let n2 = 2 * n;
+                    rleg[n1] = drts[n2 + 1]
+                        * dirt[n + m]
+                        * dirt[n - m]
+                        * (drts[n2 - 1] * cothet * rleg[n1 - 1]
+                            - drts[n + m - 1] * drts[n - m - 1] * dirt[n2 - 3] * rleg[n1 - 2]);
+                }
+            }
+
+            for i in j..=NMAX1 {
+                p[((i - 1) * i) / 2 + m + 1] = rleg[i];
+            }
+        }
+        dscml(lon, sinml, cosml);
+
+        hundu(p, sinml, cosml, gr, re)
+    })
 }
 
 fn wrap_degrees(mut degrees: f64) -> f64 {
@@ -292,7 +319,7 @@ fn interpolate<const WIDTH: usize, const HEIGHT: usize>(
     let bottom = bottom_left + dx * (bottom_right - bottom_left);
 
     // interpolate in the y direction between the top and bottom interpolated values.
-    return top + dy * (bottom - top);
+    top + dy * (bottom - top)
 }
 
 fn load_image<const WIDTH: usize, const HEIGHT: usize>(bytes: &[u8]) -> Vec<u16> {
@@ -321,13 +348,11 @@ fn load_image<const WIDTH: usize, const HEIGHT: usize>(bytes: &[u8]) -> Vec<u16>
         }
     }
 
-    return out;
+    out
 }
 
 #[cfg(feature = "raster_5_min")]
 pub fn egm96_raster_5_min_altitude_offset(lat: f64, lon: f64) -> f64 {
-    use std::sync::OnceLock;
-
     const WIDTH: usize = 4320;
     const HEIGHT: usize = 2161;
     static IMAGE: OnceLock<Vec<u16>> = OnceLock::new();
@@ -348,21 +373,19 @@ pub fn egm96_raster_5_min_altitude_offset(lat: f64, lon: f64) -> f64 {
     // GT(3) = 90.04166666666666666
     // GT(4) = 0
     // GT(5) = -0.08333333333333333
-    return interpolate::<WIDTH, HEIGHT>(
+    interpolate::<WIDTH, HEIGHT>(
         lat,
         lon,
         -0.04166666666666666,
         90.04166666666666666,
         0.08333333333333333,
         -0.08333333333333333,
-        &image,
-    );
+        image,
+    )
 }
 
 #[cfg(feature = "raster_15_min")]
 pub fn egm96_raster_15_min_altitude_offset(lat: f64, lon: f64) -> f64 {
-    use std::sync::OnceLock;
-
     const WIDTH: usize = 1440;
     const HEIGHT: usize = 721;
     static IMAGE: OnceLock<Vec<u16>> = OnceLock::new();
@@ -384,7 +407,7 @@ pub fn egm96_raster_15_min_altitude_offset(lat: f64, lon: f64) -> f64 {
     // GT(3) = 90.12500000000000000
     // GT(4) = 0
     // GT(5) = -0.25000000000000000
-    return interpolate::<WIDTH, HEIGHT>(lat, lon, -0.125, 90.125, 0.25, -0.25, &image);
+    interpolate::<WIDTH, HEIGHT>(lat, lon, -0.125, 90.125, 0.25, -0.25, image)
 }
 
 /// Public function to compute altitude offset using EGM96 model
