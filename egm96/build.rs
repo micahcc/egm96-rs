@@ -1,13 +1,12 @@
-use std::fs::{self, File};
+use std::fs;
+#[cfg(feature = "fetch-maps")]
+use std::fs::File;
+#[cfg(feature = "fetch-maps")]
 use std::io::Write;
 use std::path::Path;
 
+#[cfg(any(feature = "raster_15_min", feature = "raster_5_min"))]
 const URL_ROOT: &str = "https://micahcc.github.io/egm96-rs/egm96/data";
-
-struct Fixture<'a> {
-    name: &'a str,
-    environ: &'a str,
-}
 
 #[allow(unused)]
 fn load_blob(name: &str, env_name: &str, url: String, out_name: String) {
@@ -21,8 +20,10 @@ fn load_blob(name: &str, env_name: &str, url: String, out_name: String) {
     {
         let help = format!("To use a local file: set environment variable: {env_name}");
 
-        let response =
-            reqwest::blocking::get(&url).unwrap_or_else(|_| panic!("Failed to GET {name}. {help}"));
+        let response = reqwest::blocking::get(&url)
+            .unwrap_or_else(|_| panic!("Failed to GET {name}. {help}"))
+            .error_for_status()
+            .unwrap_or_else(|_| panic!("Failed HTTP status for {name}. {help}"));
 
         let content = response
             .bytes()
@@ -57,24 +58,20 @@ fn main() {
 
     fs::write(&dest_path, generated).expect("Failed to write generated coefficients");
 
-    // 2. Fetch or copy test map fixtures
-    let fixtures = [
-        Fixture {
-            name: "egm96-15.png",
-            environ: "EGM96_15_MIN",
-        },
-        Fixture {
-            name: "egm96-5.png",
-            environ: "EGM96_5_MIN",
-        },
-    ];
+    // 2. Fetch or copy raster fixtures only for enabled raster features.
+    #[cfg(feature = "raster_15_min")]
+    load_blob(
+        "egm96-15.png",
+        "EGM96_15_MIN",
+        format!("{URL_ROOT}/egm96-15.png"),
+        format!("{out_dir}/egm96-15.png"),
+    );
 
-    for fixture in fixtures {
-        load_blob(
-            fixture.name,
-            fixture.environ,
-            format!("{URL_ROOT}/{}", fixture.name),
-            format!("{out_dir}/{}", fixture.name),
-        );
-    }
+    #[cfg(feature = "raster_5_min")]
+    load_blob(
+        "egm96-5.png",
+        "EGM96_5_MIN",
+        format!("{URL_ROOT}/egm96-5.png"),
+        format!("{out_dir}/egm96-5.png"),
+    );
 }

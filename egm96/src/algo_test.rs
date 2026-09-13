@@ -692,8 +692,8 @@ fn test_lon_wrapping() {
 
 #[test]
 fn test_feature_fallback() {
-    let _a = egm96_altitude_offset(10.0, 20.0);
-    let _b = egm96_compute_altitude_offset(10.0, 20.0);
+    let a = egm96_altitude_offset(10.0, 20.0);
+    let b = egm96_compute_altitude_offset(10.0, 20.0);
 
     #[cfg(not(any(feature = "raster_5_min", feature = "raster_15_min")))]
     assert!((a - b).abs() < 1e-9);
