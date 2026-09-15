@@ -27,6 +27,34 @@ cargo build --release
 cp target/release/libEGM96.a target/release/libEGM96.so egm96-c/src/egm96.h /path/to/install
 ```
 
+For the command-line interface, run via cargo:
+
+```bash
+cargo run -p egm96-cli -- --lat 37.7749 --lon -122.4194
+```
+
+Alternatively, install the binary locally:
+
+```bash
+cargo install --path egm96-cli
+```
+
+#### Command-line usage
+
+Query a single point using flags or the `point` subcommand:
+
+```bash
+egm96-cli --lat 37.7749 --lon -122.4194
+egm96-cli point 37.7749 -122.4194
+```
+
+Process CSV files or standard input using the `batch` subcommand:
+
+```bash
+egm96-cli batch -i input.csv -o output.csv
+cat input.csv | egm96-cli batch > output.csv
+```
+
 ## About
 
 ### About this implementation
