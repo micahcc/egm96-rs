@@ -68,7 +68,7 @@ const EGM96_5_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/egm96-5.p
 
 /***************************************************************************/
 
-struct Egm96Scratch {
+pub struct Egm96Scratch {
     p: Box<[f64; COEFFS + 1]>,
     sinml: Box<[f64; N361 + 1]>,
     cosml: Box<[f64; N361 + 1]>,
@@ -77,7 +77,7 @@ struct Egm96Scratch {
 }
 
 impl Egm96Scratch {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             p: Box::new([0.0; COEFFS + 1]),
             sinml: Box::new([0.0; N361 + 1]),
@@ -171,8 +171,8 @@ fn radgra(lat: f64, lon: f64, rlat: &mut f64, gr: &mut f64, re: &mut f64) {
     *gr = GEQT * (1.0 + (K * t1)) / (1.0 - (E2 * t1)).sqrt(); // compute normal gravity (m/sec²)
 }
 
-/// Compute the geoid undulation from the EGM96 model
-fn undulation(lat: f64, lon: f64) -> f64 {
+/// Compute the geoid undulation from the EGM96 model using a provided scratch buffer
+fn undulation(lat: f64, lon: f64, scratch: &mut Egm96Scratch) -> f64 {
     static DRTS_DIRT: OnceLock<([f64; 1301], [f64; 1301])> = OnceLock::new();
     let (drts, dirt) = DRTS_DIRT.get_or_init(|| {
         let nmax2p = (2 * NMAX) + 1;
@@ -185,76 +185,73 @@ fn undulation(lat: f64, lon: f64) -> f64 {
         (drts, dirt)
     });
 
-    SCRATCH.with(|scratch| {
-        let mut s = scratch.borrow_mut();
-        let Egm96Scratch {
-            p,
-            sinml,
-            cosml,
-            rleg,
-            rlnn,
-        } = &mut *s;
+    let Egm96Scratch {
+        p,
+        sinml,
+        cosml,
+        rleg,
+        rlnn,
+    } = scratch;
 
-        let mut rlat = 0.0;
-        let mut gr = 0.0;
-        let mut re = 0.0;
+    let mut rlat = 0.0;
+    let mut gr = 0.0;
+    let mut re = 0.0;
 
-        radgra(lat, lon, &mut rlat, &mut gr, &mut re);
-        rlat = (PI / 2.0) - rlat;
-        let cothet = rlat.cos();
-        let sithet = rlat.sin();
+    radgra(lat, lon, &mut rlat, &mut gr, &mut re);
+    rlat = (PI / 2.0) - rlat;
+    let cothet = rlat.cos();
+    let sithet = rlat.sin();
 
-        rlnn[1] = 1.0;
-        rlnn[2] = sithet * drts[3];
-        for j in 1..=NMAX1 {
-            let m = j - 1;
-            let m1 = m + 1;
-            for n1 in 3..=m1 {
+    rlnn[1] = 1.0;
+    rlnn[2] = sithet * drts[3];
+    for j in 1..=NMAX1 {
+        let m = j - 1;
+        let m1 = m + 1;
+        for n1 in 3..=m1 {
+            let n = n1 - 1;
+            let n2 = 2 * n;
+            rlnn[n1] = drts[n2 + 1] * dirt[n2] * sithet * rlnn[n];
+        }
+    }
+
+    for j in 1..=NMAX1 {
+        let m = j - 1;
+        let m1 = m + 1;
+        let m2 = m + 2;
+        let m3 = m + 3;
+
+        if m == 0 {
+            rleg[1] = 1.0;
+            rleg[2] = cothet * drts[3];
+        } else if m == 1 {
+            rleg[2] = rlnn[2];
+            rleg[3] = drts[5] * cothet * rleg[2];
+        }
+        rleg[m1] = rlnn[m1];
+
+        if m2 <= NMAX1 {
+            rleg[m2] = drts[m1 * 2 + 1] * cothet * rleg[m1];
+            for n1 in m3..=NMAX1 {
                 let n = n1 - 1;
-                let n2 = 2 * n;
-                rlnn[n1] = drts[n2 + 1] * dirt[n2] * sithet * rlnn[n];
-            }
-        }
-
-        for j in 1..=NMAX1 {
-            let m = j - 1;
-            let m1 = m + 1;
-            let m2 = m + 2;
-            let m3 = m + 3;
-
-            if m == 0 {
-                rleg[1] = 1.0;
-                rleg[2] = cothet * drts[3];
-            } else if m == 1 {
-                rleg[2] = rlnn[2];
-                rleg[3] = drts[5] * cothet * rleg[2];
-            }
-            rleg[m1] = rlnn[m1];
-
-            if m2 <= NMAX1 {
-                rleg[m2] = drts[m1 * 2 + 1] * cothet * rleg[m1];
-                for n1 in m3..=NMAX1 {
-                    let n = n1 - 1;
-                    if (m != 0 && n < 2) || (m == 1 && n < 3) {
-                        continue;
-                    }
-                    let n2 = 2 * n;
-                    rleg[n1] = drts[n2 + 1]
-                        * dirt[n + m]
-                        * dirt[n - m]
-                        * (drts[n2 - 1] * cothet * rleg[n1 - 1]
-                            - drts[n + m - 1] * drts[n - m - 1] * dirt[n2 - 3] * rleg[n1 - 2]);
+                if (m != 0 && n < 2) || (m == 1 && n < 3) {
+                    continue;
                 }
-            }
-
-            for i in j..=NMAX1 {
-                p[((i - 1) * i) / 2 + m + 1] = rleg[i];
+                let n2 = 2 * n;
+                rleg[n1] = drts[n2 + 1]
+                    * dirt[n + m]
+                    * dirt[n - m]
+                    * (drts[n2 - 1] * cothet * rleg[n1 - 1]
+                        - drts[n + m - 1] * drts[n - m - 1] * dirt[n2 - 3] * rleg[n1 - 2]);
             }
         }
-        dscml(lon, sinml, cosml);
 
-        hundu(p, sinml, cosml, gr, re)
-    })
+        for i in j..=NMAX1 {
+            p[((i - 1) * i) / 2 + m + 1] = rleg[i];
+        }
+    }
+    dscml(lon, sinml, cosml);
+
+    hundu(p, sinml, cosml, gr, re)
 }
 
 fn wrap_degrees(mut degrees: f64) -> f64 {
@@ -263,10 +260,22 @@ fn wrap_degrees(mut degrees: f64) -> f64 {
     degrees - 180.0
 }
 
-pub fn egm96_compute_altitude_offset(lat: f64, lon: f64) -> f64 {
+/// Compute altitude offset using an explicitly provided scratch buffer (zero-overhead)
+pub fn egm96_compute_altitude_offset_with_scratch(
+    lat: f64,
+    lon: f64,
+    scratch: &mut Egm96Scratch,
+) -> f64 {
     let lon = wrap_degrees(lon);
     let lat = lat.clamp(-90.0, 90.0);
-    undulation(lat.to_radians(), lon.to_radians())
+    undulation(lat.to_radians(), lon.to_radians(), scratch)
+}
+
+/// Compute altitude offset using a thread-local scratch buffer (convenience wrapper)
+pub fn egm96_compute_altitude_offset(lat: f64, lon: f64) -> f64 {
+    SCRATCH.with(|scratch| {
+        egm96_compute_altitude_offset_with_scratch(lat, lon, &mut scratch.borrow_mut())
+    })
 }
 
 #[allow(unused)]

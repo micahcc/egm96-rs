@@ -24,13 +24,28 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     let mut harmonics_group = c.benchmark_group("harmonics multi-point");
     harmonics_group.throughput(Throughput::Elements(test_points.len() as u64));
-    harmonics_group.bench_function("cts harmonics multi-point", |b| {
+
+    harmonics_group.bench_function("cts harmonics multi-point (tls)", |b| {
         b.iter(|| {
             for &(lat, lon) in &test_points {
                 egm96::egm96_compute_altitude_offset(black_box(lat), black_box(lon));
             }
         })
     });
+
+    harmonics_group.bench_function("cts harmonics multi-point (scratch)", |b| {
+        let mut scratch = egm96::Egm96Scratch::new();
+        b.iter(|| {
+            for &(lat, lon) in &test_points {
+                egm96::egm96_compute_altitude_offset_with_scratch(
+                    black_box(lat),
+                    black_box(lon),
+                    &mut scratch,
+                );
+            }
+        })
+    });
+
     harmonics_group.finish();
 
     #[cfg(feature = "raster_15_min")]
